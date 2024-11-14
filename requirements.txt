@@ -1,0 +1,5 @@
+yfinance
+pandas
+black
+#  hit command "pre-commit install" after installing
+pre-commit
