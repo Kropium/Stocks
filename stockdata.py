@@ -14,7 +14,6 @@ class Stock:
         self.volume = volume
 
 def __repr__(self):
-        # Return a string with all the values for easy reading
         return (f"Stock(symbol={self.symbol}, timestamp={self.timestamp}, "
                 f"Open={self.open_price}, Close={self.close_price}, "
                 f"High={self.high}, Low={self.low}, Volume={self.volume})")
@@ -30,8 +29,6 @@ end_date = current_time
 
 data = yf.download(symbol, start=start_date, end=end_date, interval='1m')
 
-print(data.head())
-
 stocks = []
 
 for timestamp, row in data.iterrows():
@@ -46,8 +43,22 @@ for timestamp, row in data.iterrows():
     )
     stocks.append(stock)
 
-for stock in stocks[:10]:
-    print(f"volume: {stock.volume}")
+print(stocks[-3].volume, stocks[-2].volume)
+
+
+def volume_difference(old_volume, new_volume):
+
+    difference = new_volume - old_volume
+    percentage_difference = (difference / old_volume) * 100
+
+    return percentage_difference
+
+old_volume = (stocks[-2].volume)
+new_volume = (stocks[-3].volume)
+result = float(volume_difference(new_volume, old_volume))
+
+print(result)
+
 #class StockMarketChecker:
     #def __init__(self, stocks):
         #self.stocks = stocks  # List of Stock objects 
