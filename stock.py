@@ -67,6 +67,20 @@ class Stock:
         relatieve_verschil_prijs = round(prijs_verschil / market_data[-minutes_ago].close, 6)
         logger.debug(f"Verschil: {prijs_verschil} ({relatieve_verschil_prijs*100}%)")
         return relatieve_verschil_prijs
- 
+
+    def check_market_conditions(self, time_intervals: list, volume_threshold: float, price_threshold: float):
+   
+        for minutes_ago in time_intervals:
+     
+            volume_change = self.get_change_in_volume(minutes_ago)
+            price_movement = self.get_price_movement(minutes_ago)
+
+            if (volume_change) >= volume_threshold:
+                logger.info(f"Volume change for {minutes_ago} minutes ago: {volume_change*100:.2f}% exceeds threshold.") 
+            if (price_movement) >= price_threshold:
+                logger.info(f"Price movement for {minutes_ago} minutes ago: {price_movement*100:.2f}% exceeds threshold.")
+
+            
+
     def __repr__(self):
         return f"{self.ticker}"
