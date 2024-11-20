@@ -32,55 +32,93 @@ class Stock:
             self.market_data[timestamp] = MarketData(timestamp, *row)
         logger.debug(f"Data staat klaar")
 
-    def get_change_in_volume(self, minutes_ago: int) -> int | float:
-        """Return relatieve verschil in volume"""
-        if len(self.market_data) < minutes_ago:
-            logger.debug(f"Onvoldoende data om dit te doen")
-            return 0
-        if minutes_ago == 0:
-            return 0
+    def get_change_in_volume(self, minutes_ago: int) -> list[int | float]:
+        if len(self.market_data) < minutes_ago + 1:
+            logger.debug("Onvoldoende data om dit te doen")
+            return []
+
         market_data = list(self.market_data.values())
-        if market_data[-minutes_ago].volume == 0:
-            return 0
-        logger.debug(
-            f"Oude volume: {market_data[-minutes_ago].volume}, nieuwe volume: {market_data[-2].volume}"
-        )
-        absolute_verschil = market_data[-2].volume - market_data[-minutes_ago].volume
-        relatieve_verschil = round(absolute_verschil / market_data[-minutes_ago].volume, 6)
-        logger.debug(f"Verschil: {absolute_verschil} ({relatieve_verschil*100}%)")
-        return relatieve_verschil
-    
-    def get_price_movement(self, minutes_ago: int) -> int | float: 
-        """Return verschil in prijs"""
-        if len(self.market_data) < minutes_ago:
-            logger.debug(f"Onvoldoende data om dit te doen")
-            return 0 
-        if minutes_ago == 0:
-            return 0
+        volume_changes = []
+
+        for i in range(1, minutes_ago + 1):
+            if market_data[-i].volume == 0 or market_data[-(i + 1)].volume == 0:
+                logger.debug(
+                    f"Volume is zero at index {-(i+1)} or {-(i)}, cannot calculate volume change."
+                )
+                volume_changes.append(0)  # Append 0 if any volume is 0
+                continue
+
+            absolute_verschil = market_data[-i].volume - market_data[-(i + 1)].volume
+            if market_data[-(i + 1)].volume == 0:
+                volume_changes.append(0)
+                continue
+
+            relatieve_verschil = round(absolute_verschil / market_data[-(i + 1)].volume, 6)
+            logger.debug(
+                f"Comparing minute -{i} with minute -{i+1}: Oude volume: {market_data[-(i + 1)].volume}, nieuwe volume: {market_data[-i].volume}"
+            )
+            logger.debug(f"Verschil: {absolute_verschil} ({relatieve_verschil*100}%)")
+            volume_changes.append(relatieve_verschil)
+
+        return volume_changes
+
+    def get_price_movement(self, minutes_ago: int) -> list[int | float]:
+        if len(self.market_data) < minutes_ago + 1:
+            logger.debug("Onvoldoende data om dit te doen")
+            return []
+
         market_data = list(self.market_data.values())
-        if market_data[-minutes_ago].close == 0:
-            return 0
+        price_movements = []
+
+        for i in range(1, minutes_ago + 1):
+            if market_data[-i].close == 0 or market_data[-(i + 1)].close == 0:
+                logger.debug(
+                    f"Close price is zero at index {-(i+1)} or {-(i)}, cannot calculate price movement."
+                )
+                price_movements.append(0)
+                continue
+
+            prijs_verschil = market_data[-i].close - market_data[-(i + 1)].close
+            if market_data[-(i + 1)].close == 0:
+                price_movements.append(0)
+                continue
+
+        relatieve_verschil_prijs = round(prijs_verschil / market_data[-(i + 1)].close, 6)
         logger.debug(
-            f"Oude close: {market_data[-minutes_ago].close}, nieuwe close: {market_data[-2].close}"
+            f"Comparing minute -{i} with minute -{i+1}: Oude close: {market_data[-(i + 1)].close}, nieuwe close: {market_data[-i].close}"
         )
-        prijs_verschil = market_data[-2].close - market_data[-minutes_ago].close
-        relatieve_verschil_prijs = round(prijs_verschil / market_data[-minutes_ago].close, 6)
         logger.debug(f"Verschil: {prijs_verschil} ({relatieve_verschil_prijs*100}%)")
-        return relatieve_verschil_prijs
+        price_movements.append(relatieve_verschil_prijs)
 
-    def check_market_conditions(self, time_intervals: list, volume_threshold: float, price_threshold: float):
-   
+        return price_movements
+
+    def check_market_conditions(
+        self, time_intervals: list, volume_threshold: float, price_threshold: float
+    ):
         for minutes_ago in time_intervals:
-     
-            volume_change = self.get_change_in_volume(minutes_ago)
-            price_movement = self.get_price_movement(minutes_ago)
+            price_movements = self.get_price_movement(minutes_ago)
 
-            if (volume_change) >= volume_threshold:
-                logger.info(f"Volume change for {minutes_ago} minutes ago: {volume_change*100:.2f}% exceeds threshold.") 
-            if (price_movement) >= price_threshold:
-                logger.info(f"Price movement for {minutes_ago} minutes ago: {price_movement*100:.2f}% exceeds threshold.")
+            if not price_movements:
+                logger.warning(f"No price movements found for {minutes_ago} minutes ago.")
+                continue
 
-            
+            for i, price_movement in enumerate(price_movements, start=1):
+                if price_movement >= price_threshold:
+                    logger.info(
+                        f"Price movement for {minutes_ago - i + 1} minutes ago: {price_movement * 100:.2f}% exceeds threshold."
+                    )
+
+            volume_changes = self.get_change_in_volume(minutes_ago)
+
+            if not volume_changes:
+                logger.warning(f"No volume changes found for {minutes_ago} minutes ago.")
+                continue
+
+            for i, volume_change in enumerate(volume_changes, start=1):
+                if volume_change >= volume_threshold:
+                    logger.info(
+                        f"Volume change for {minutes_ago - i + 1} minutes ago: {volume_change * 100:.2f}% exceeds threshold."
+                    )
 
     def __repr__(self):
         return f"{self.ticker}"
