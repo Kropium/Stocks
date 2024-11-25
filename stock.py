@@ -1,10 +1,7 @@
 from datetime import datetime, date
-
 import pandas as pd
 import yfinance as yf
-
 from market_data import MarketData
-
 from logger import logger
 
 
@@ -87,6 +84,19 @@ class Stock:
             price_movements.append(relatieve_verschil_prijs)
 
         return price_movements
+
+    def get_price(self, price_type: str = "close") -> float:
+        """Get the most recent price of the stock."""
+        if not self.market_data:
+            logger.warning(f"No market data available for {self.ticker}.")
+            return 0.0
+        most_recent_data = list(self.market_data.values())[-1]
+
+        if price_type not in ["close", "open", "high", "low"]:
+            logger.warning(f"Invalid price type requested: {price_type}. Defaulting to 'close'.")
+            price_type = "close"
+
+        return getattr(most_recent_data, price_type)
 
     def check_consecutive_conditions(
         self, interval_1: int, interval_2: int, volume_threshold: float, price_threshold: float
