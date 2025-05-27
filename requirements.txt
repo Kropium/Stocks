@@ -1,5 +1,10 @@
 yfinance
 pandas
 black
+multiprocessing
+logger
+sqlalchemy
+datetime
+
 #  hit command "pre-commit install" after installing
 pre-commit

@@ -1,29 +1,7 @@
 {
-    "balance": 4234.354674935341,
-    "stocks": {
-        "TSLA": {
-            "quantity": 3,
-            "buy_price": 352.1199035644531
-        },
-        "GME": {
-            "quantity": 38,
-            "buy_price": 28.8543
-        },
-        "BIVI": {
-            "quantity": 389,
-            "buy_price": 3.049999952316284
-        },
-        "ADTX": {
-            "quantity": 2648,
-            "buy_price": 0.39010000228881836
-        },
-        "MGNX": {
-            "quantity": 259,
-            "buy_price": 3.380000114440918
-        },
-        "RAPT": {
-            "quantity": 659,
-            "buy_price": 1.132099986076355
-        }
-    }
+    "balance": 15356.376961158265,
+    "stocks": {},
+    "sell_cooldowns": {
+    },
+    "trailing_stoploss": {}
 }
