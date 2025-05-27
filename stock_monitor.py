@@ -1,110 +1,89 @@
-from stock import Stock
-from logger import logger
 import time
-from wallet import VirtualWallet
-import pandas
 import json
+import multiprocessing
+from logger import logger
+from wallet import VirtualWallet
+from stock_db import StockRaw  # Updated import: new class with DB integration
 
-
-def monitor_stocks():
-    tickers = [
-        "AAPL",
-        "TSLA",
-        "AMZN",
-        "ADTX",
-        "ALLR",
-        "BIVI",
-        "FGEN",
-        "IMUX",
-        "GME",
-        "CHWY",
-        "QMCO",
-        "BLUE",
-        "ADAP",
-        "ADPT",
-        "GNPX",
-        "MGNX",
-        "CRBU" "BIOR",
-        "OMGA",
-        "REVB",
-        "RAPT",
-        "BNGO",
-        "ATXI",
-        "ALZN",
-        "EVGN",
-        "SAGE",
-        "BFRI",
-    ]
-
-    time_intervals = [1, 2, 3, 4, 5, 6, 7, 8]
-    volume_threshold = 0.3
-    price_threshold = 0.002
-    ticker_index = 0
+def monitor_stock(ticker):
+    volume_threshold = 0.25
+    price_threshold = 0.01
+    cooldown_period = 360 
 
     wallet = VirtualWallet(filename="wallet.json")
-
     logger.debug(f"Initial wallet balance: {wallet.check_balance()}")
 
-    while True:
-        for ticker, stock_data in wallet.stocks.items():
-            stock = Stock(ticker)
-            stock.obtain_market_data()
+    if ticker in wallet.sell_cooldowns:
+        last_sell_time = wallet.sell_cooldowns[ticker]
+        if time.time() - last_sell_time < cooldown_period:
+            remaining = cooldown_period - (time.time() - last_sell_time)
+            logger.info(f"Cooldown active for {ticker}. Try again in {remaining:.2f} seconds.")
+            return
 
-            if wallet.sell_stock(stock, profit_threshold=0.1, loss_threshold=0.05):
-                logger.info(f"Successfully sold {ticker} based on profit or loss conditions.")
+    stock = StockRaw(ticker)
+    stock.fetch_market_data_from_db()
 
-        current_ticker = tickers[ticker_index]
-        if current_ticker in wallet.stocks:
-            logger.info(f"Stock {current_ticker} already in the wallet. Skipping buy check.")
-            ticker_index += 1
-            if ticker_index >= len(tickers):
-                ticker_index = 0
-            time.sleep(1)
-            continue
-        logger.info(f"Monitoring stock: {current_ticker}")
 
-        stock = Stock(current_ticker)
-        stock.obtain_market_data()
+    if ticker in wallet.stocks:
+        snapshots = stock.get_last_two_snapshots()
+        if not snapshots or not snapshots[-1].close:
+            logger.warning(f"Not enough or invalid data to evaluate selling {ticker}.")
+            return
 
-        conditions_met = False
-
-        # Check conditions for each time interval
-        for i in range(1, len(time_intervals) - 1):
-            if stock.check_consecutive_conditions(
-                time_intervals[i - 1], time_intervals[i], volume_threshold, price_threshold
-            ):
-                conditions_met = True
-                logger.info(
-                    f"Conditions met for {current_ticker} at time intervals {time_intervals[i - 1]} and {time_intervals[i]}"
-                )
-                # Perform stock purchase and save wallet immediately after
-                if wallet.buy_stock(stock, minutes_ago=1):
-                    wallet.save_wallet(wallet.filename)  # Save wallet after purchase
-                break
-            elif stock.check_consecutive_conditions(
-                time_intervals[i], time_intervals[i + 1], volume_threshold, price_threshold
-            ):
-                conditions_met = True
-                logger.info(
-                    f"Conditions met for {current_ticker} at time intervals {time_intervals[i]} and {time_intervals[i + 1]}"
-                )
-                # Perform stock purchase and save wallet immediately after
-                if wallet.buy_stock(stock, minutes_ago=1):
-                    wallet.save_wallet(wallet.filename)  # Save wallet after purchase
-                break
-
-        # Exit loop if conditions are met for the stock
-        if conditions_met:
-            logger.info(f"Conditions met for {current_ticker}. Exiting monitoring loop.")
-            break
+        if wallet.sell_stock(stock):
+            logger.info(f"Sold {ticker} based on trailing stop loss.")
+            wallet.sell_cooldowns[ticker] = time.time()
+            wallet.save_wallet(wallet.filename)
         else:
-            logger.info(f"Conditions not met for {current_ticker}. Moving to the next ticker.")
-            ticker_index += 1
+            logger.info(f"Trailing stop loss not triggered for {ticker}.")
+        return
 
-            if ticker_index >= len(tickers):
-                ticker_index = 0
+    # If not owned, check for buy signal
+    logger.info(f"Monitoring stock: {ticker} for buying conditions.")
+    change = stock.get_change_since_last_retrieved()
+    if not change:
+        logger.info(f"Insufficient data to evaluate buying {ticker}.")
+        return
 
-            time.sleep(2)
+    price_change = change.get("price_change")
+    volume_change = change.get("volume_change")
 
-    logger.debug(f"Current balance: {wallet.check_balance()}")
-    logger.debug(f"Current portfolio: {wallet.check_portfolio()}")
+    if (price_change is not None and abs(price_change) > price_threshold and
+        volume_change is not None and abs(volume_change) > volume_threshold):
+        
+        logger.info(f"Buy conditions met for {ticker} (Δprice={price_change}, Δvolume={volume_change}).")
+        if wallet.buy_stock(stock, minutes_ago=1):
+            wallet.save_wallet(wallet.filename)
+    else:
+        logger.info(f"Buy conditions NOT met for {ticker} (Δprice={price_change}, Δvolume={volume_change}).")
+
+    logger.debug(f"Balance: {wallet.check_balance()}")
+    logger.debug(f"Portfolio: {wallet.check_portfolio()}")
+
+
+def monitor_stocks_parallel():
+    tickers = [
+        "ADTX", "BIVI", "IMUX", "AUR", "CAPT", "THTX", "BHAT", "BLUE", "SILO", "SANA",
+        "AEON", "IFBD", "PMNT", "RAPT", "BNGO", "ALZN", "SAGE", "ACRV", "RSLS", "TIVC",
+        "PSTX", "BJDX", "NDRA", "GOVX", "MBIO", "ATAI", "CELU", "PRFX", "TOVX", "ONCT",
+        "LGVN", "PHGE", "WINT", "HLVX", "BCTX", "BNOX", "EVAX", "BLRX", "IMRX", "CTOR",
+        "AILE", "AVTX", "AQB", "ICCT", "CYN", "KITT", "SLDP", "NLSP", "GCTK", "VINC",
+        "KPTI", "MITQ", "PTPI", "SURG", "PRPH", "CRKN", "MEGL", "BMRA", "ENSC", "CTXR",
+        "EKSO", "INVZ", "HOTH", "XAIR", "PHIO", "MYSZ", "LPSN", "MLGO", "LPTX", "OCEA",
+        "GV", "WTO", "APVO"
+    ]
+
+    max_cores = int(multiprocessing.cpu_count() * 0.7)
+    chunk_size = len(tickers) // max_cores + 1
+    ticker_chunks = [tickers[i:i + chunk_size] for i in range(0, len(tickers), chunk_size)]
+
+    while True:
+        with multiprocessing.Pool(processes=max_cores) as pool:
+            pool.map(monitor_stock, [ticker for chunk in ticker_chunks for ticker in chunk])
+
+        logger.info("Round complete. Restarting monitoring cycle after delay.")
+        time.sleep(15)
+
+
+if __name__ == "__main__":
+    monitor_stocks_parallel()

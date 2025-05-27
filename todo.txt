@@ -1,0 +1,9 @@
+groter gedeelte van mn port te doen, en dan zodra hij signal heeft overschakelen op stage 2, elke 2 seconden opvragen van de wallet en profit maximisen
+database gebruiken ipv json
+
+meer signalen 
+uitlezen huidige geschiedenis
+constant zoeken naar verschillende opties en confidence numbers binnen de data. 
+update monitor voor het donwloaden en saven van de data
+aanpassen functies voor data per 12 sec ipv  minuut
+
