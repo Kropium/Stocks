@@ -104,7 +104,6 @@ class StockRaw:
         finally:
             session.close() 
 
-
     def fetch_market_data_from_db(self):
         """Fetch the last 5 minutes of market data from the database."""
         session = SessionLocal()
